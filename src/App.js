@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import styled from "styled-components";
 
+// Styled Components
 const AppContainer = styled.div`
   text-align: center;
   padding: 20px;
+  position: relative;
 `;
 
 const BuilderContainer = styled.div`
@@ -46,6 +48,7 @@ const FormComponent = styled(DraggableItem)`
   position: relative;
 `;
 
+// Updated IconButton Styling
 const IconButton = styled.button`
   background: none;
   border: none;
@@ -53,6 +56,7 @@ const IconButton = styled.button`
   font-size: 1.2em;
 `;
 
+// CloseButton remains unchanged
 const CloseButton = styled.button`
   margin-top: 20px;
   padding: 10px 20px;
@@ -69,6 +73,7 @@ const CloseButton = styled.button`
   }
 `;
 
+// MainButton remains unchanged
 const MainButton = styled.button`
   margin: 10px;
   padding: 10px 20px;
@@ -85,6 +90,31 @@ const MainButton = styled.button`
   }
 `;
 
+// Styled Component for History Panel Buttons
+const HistoryButton = styled.button`
+  background-color: #6c757d;
+  color: #f9f9f9;
+  border: 2px solid #f9f9f9;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.3s ease, color 0.3s ease;
+
+  &:hover {
+    background-color: #5a6268;
+    color: #ffffff;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5);
+  }
+`;
+
+// Modal Overlay Styling remains unchanged
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -122,6 +152,22 @@ const PreviewPanel = styled(PropertiesPanel)`
   width: 500px;
 `;
 
+// Notification Styling
+const NotificationContainer = styled.div`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: ${({ success }) => (success ? "#28a745" : "#dc3545")};
+  color: white;
+  padding: 15px 25px;
+  border-radius: 4px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+  display: ${({ visible }) => (visible ? "block" : "none")};
+  z-index: 1100;
+  transition: opacity 0.5s ease-in-out;
+  opacity: ${({ visible }) => (visible ? 1 : 0)};
+`;
+
 const TitleContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -134,6 +180,58 @@ const FormTitle = styled.h2`
   color: #343a40;
   margin-bottom: 10px;
 `;
+
+// Styled Components for Preview Panel
+const PreviewField = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  width: 100%;
+`;
+
+const PreviewLabel = styled.label`
+  font-weight: bold;
+  margin-bottom: 5px;
+`;
+
+const PreviewInput = styled.input`
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+`;
+
+const PreviewTextarea = styled.textarea`
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+`;
+
+const PreviewSelect = styled.select`
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+`;
+
+const PreviewCheckboxContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+`;
+
+const PreviewRadioContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+`;
+
+// Notification Component
+const Notification = ({ message, success, visible }) => (
+  <NotificationContainer success={success} visible={visible}>
+    {message}
+  </NotificationContainer>
+);
 
 const ItemTypes = {
   COMPONENT: "component",
@@ -216,6 +314,11 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [formHistory, setFormHistory] = useState([]);
   const [currentFormId, setCurrentFormId] = useState(null);
+
+  // Notification state
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationSuccess, setNotificationSuccess] = useState(true);
 
   const componentsList = [
     { id: "textInput", label: "Text Input" },
@@ -300,15 +403,37 @@ function App() {
           body: JSON.stringify(formData),
         });
       }
+
       const result = await response.json();
-      alert(result.message || "Form saved successfully!");
-      if (!currentFormId && result.formId) {
-        setCurrentFormId(result.formId);
+
+      if (response.ok) {
+        setNotificationMessage(result.message || "Form saved successfully!");
+        setNotificationSuccess(true);
+        if (!currentFormId && result.formId) {
+          setCurrentFormId(result.formId);
+        }
+      } else {
+        setNotificationMessage(result.message || "Failed to save form.");
+        setNotificationSuccess(false);
       }
     } catch (error) {
       console.error("Error saving form:", error);
+      setNotificationMessage("Error saving form.");
+      setNotificationSuccess(false);
     }
+
+    setShowNotification(true);
   };
+
+  // Automatically hide the notification after 3 seconds
+  useEffect(() => {
+    if (showNotification) {
+      const timer = setTimeout(() => {
+        setShowNotification(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showNotification]);
 
   const closePreviewPanel = () => {
     setPreviewMode(false);
@@ -322,6 +447,9 @@ function App() {
       setFormHistory(data);
     } catch (error) {
       console.error("Error fetching form history:", error);
+      setNotificationMessage("Error fetching form history.");
+      setNotificationSuccess(false);
+      setShowNotification(true);
     }
   };
 
@@ -333,8 +461,14 @@ function App() {
       setFormComponents(data.form_data);
       setCurrentFormId(data.id);
       setShowHistory(false);
+      setNotificationMessage("Form loaded successfully!");
+      setNotificationSuccess(true);
+      setShowNotification(true);
     } catch (error) {
       console.error("Error loading form:", error);
+      setNotificationMessage("Error loading form.");
+      setNotificationSuccess(false);
+      setShowNotification(true);
     }
   };
 
@@ -342,7 +476,7 @@ function App() {
     <DndProvider backend={HTML5Backend}>
       <AppContainer>
         <h1>Form Builder</h1>
-        
+
         <TitleContainer>
           <FormTitle>Form Name</FormTitle>
           <input
@@ -421,12 +555,14 @@ function App() {
                 formComponents[selectedComponentIndex].type
               ) && (
                 <>
-                  <Label>Required:</Label>
-                  <input
-                    type="checkbox"
-                    checked={formComponents[selectedComponentIndex].required}
-                    onChange={(e) => handlePropertyChange(e, "required")}
-                  />
+                  <Label>
+                    Required:
+                    <input
+                      type="checkbox"
+                      checked={formComponents[selectedComponentIndex].required}
+                      onChange={(e) => handlePropertyChange(e, "required")}
+                    />
+                  </Label>
                   <Label>Options:</Label>
                   {formComponents[selectedComponentIndex].options.map(
                     (opt, index) => (
@@ -478,24 +614,24 @@ function App() {
               <h2>Form Preview</h2>
               <div>{formTitle}</div>
               {formComponents.map((comp, index) => (
-                <div key={index} style={{ marginBottom: "15px" }}>
-                  <label>{comp.label}</label>
+                <PreviewField key={index}>
+                  <PreviewLabel>{comp.label}</PreviewLabel>
                   {comp.type === "textInput" && (
-                    <input
+                    <PreviewInput
                       type="text"
                       placeholder={comp.placeholder}
                       required={comp.required}
                     />
                   )}
                   {comp.type === "textArea" && (
-                    <textarea
+                    <PreviewTextarea
                       placeholder={comp.placeholder}
                       maxLength={comp.maxLength}
                       required={comp.required}
                     />
                   )}
                   {comp.type === "selectDropdown" && (
-                    <select required={comp.required}>
+                    <PreviewSelect required={comp.required}>
                       <option value="">Select an option</option>
                       {comp.options &&
                         comp.options.map((opt, i) => (
@@ -503,10 +639,10 @@ function App() {
                             {opt}
                           </option>
                         ))}
-                    </select>
+                    </PreviewSelect>
                   )}
                   {comp.type === "checkbox" && (
-                    <div>
+                    <PreviewCheckboxContainer>
                       {comp.options &&
                         comp.options.map((opt, i) => (
                           <label
@@ -522,10 +658,10 @@ function App() {
                             {opt}
                           </label>
                         ))}
-                    </div>
+                    </PreviewCheckboxContainer>
                   )}
                   {comp.type === "radioButton" && (
-                    <div>
+                    <PreviewRadioContainer>
                       {comp.options &&
                         comp.options.map((opt, i) => (
                           <label
@@ -541,15 +677,15 @@ function App() {
                             {opt}
                           </label>
                         ))}
-                    </div>
+                    </PreviewRadioContainer>
                   )}
                   {comp.type === "datePicker" && (
-                    <input type="date" required={comp.required} />
+                    <PreviewInput type="date" required={comp.required} />
                   )}
                   {comp.type === "fileUpload" && (
-                    <input type="file" required={comp.required} />
+                    <PreviewInput type="file" required={comp.required} />
                   )}
-                </div>
+                </PreviewField>
               ))}
               <CloseButton onClick={closePreviewPanel}>
                 Close Preview
@@ -564,13 +700,12 @@ function App() {
               <h2>Form History</h2>
               <ul style={{ listStyle: "none", padding: 0 }}>
                 {formHistory.map((form) => (
-                  <li key={form.id} style={{ marginBottom: "10px" }}>
-                    <button onClick={() => loadForm(form.id)}>
+                  <li key={form.id} style={{ marginBottom: "15px" }}>
+                    <HistoryButton onClick={() => loadForm(form.id)}>
                       {form.form_name}
-                    </button>
-                    <div>
-                      Last updated:{" "}
-                      {new Date(form.updated_at).toLocaleString()}
+                    </HistoryButton>
+                    <div style={{ color: "#6c757d", fontSize: "0.9em", marginTop: "5px" }}>
+                      Last updated: {new Date(form.updated_at).toLocaleString()}
                     </div>
                   </li>
                 ))}
@@ -587,6 +722,13 @@ function App() {
           {previewMode ? "Edit Mode" : "Preview Mode"}
         </MainButton>
         <MainButton onClick={handleSaveForm}>Save Form</MainButton>
+
+        {/* Notification Component */}
+        <Notification
+          message={notificationMessage}
+          success={notificationSuccess}
+          visible={showNotification}
+        />
       </AppContainer>
     </DndProvider>
   );
