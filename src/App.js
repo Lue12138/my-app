@@ -53,6 +53,38 @@ const IconButton = styled.button`
   font-size: 1.2em;
 `;
 
+const CloseButton = styled.button`
+  margin-top: 20px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  background-color: #28a745;
+  color: white;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #218838;
+  }
+`;
+
+const MainButton = styled.button`
+  margin: 10px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  background-color: #6c757d;
+  color: white;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: #5a6268;
+  }
+`;
+
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -86,18 +118,21 @@ const Label = styled.label`
   margin-bottom: 8px;
 `;
 
-const CloseButton = styled.button`
-  margin-top: 20px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  background-color: #007bff;
-  color: white;
-  cursor: pointer;
-`;
-
 const PreviewPanel = styled(PropertiesPanel)`
   width: 500px;
+`;
+
+const TitleContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+`;
+
+const FormTitle = styled.h2`
+  font-size: 1.5em;
+  color: #343a40;
+  margin-bottom: 10px;
 `;
 
 const ItemTypes = {
@@ -178,6 +213,9 @@ function App() {
   const [formComponents, setFormComponents] = useState([]);
   const [selectedComponentIndex, setSelectedComponentIndex] = useState(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [formHistory, setFormHistory] = useState([]);
+  const [currentFormId, setCurrentFormId] = useState(null);
 
   const componentsList = [
     { id: "textInput", label: "Text Input" },
@@ -239,17 +277,34 @@ function App() {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/forms/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "my-secure-api-token",
-        },
-        body: JSON.stringify(formData),
-      });
+      let response;
+      if (currentFormId) {
+        response = await fetch(
+          `http://localhost:8000/api/forms/update/${currentFormId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "my-secure-api-token",
+            },
+            body: JSON.stringify(formData),
+          }
+        );
+      } else {
+        response = await fetch("http://localhost:8000/api/forms/save", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "my-secure-api-token",
+          },
+          body: JSON.stringify(formData),
+        });
+      }
       const result = await response.json();
-      console.log("Form saved:", result);
       alert(result.message || "Form saved successfully!");
+      if (!currentFormId && result.formId) {
+        setCurrentFormId(result.formId);
+      }
     } catch (error) {
       console.error("Error saving form:", error);
     }
@@ -259,16 +314,44 @@ function App() {
     setPreviewMode(false);
   };
 
+  const handleShowHistory = async () => {
+    setShowHistory(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/forms/list");
+      const data = await response.json();
+      setFormHistory(data);
+    } catch (error) {
+      console.error("Error fetching form history:", error);
+    }
+  };
+
+  const loadForm = async (formId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/forms/${formId}`);
+      const data = await response.json();
+      setFormTitle(data.form_name);
+      setFormComponents(data.form_data);
+      setCurrentFormId(data.id);
+      setShowHistory(false);
+    } catch (error) {
+      console.error("Error loading form:", error);
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <AppContainer>
         <h1>Form Builder</h1>
-        <input
-          type="text"
-          placeholder="Enter form title"
-          value={formTitle}
-          onChange={(e) => setFormTitle(e.target.value)}
-        />
+        
+        <TitleContainer>
+          <FormTitle>Form Name</FormTitle>
+          <input
+            type="text"
+            placeholder="Enter form title"
+            value={formTitle}
+            onChange={(e) => setFormTitle(e.target.value)}
+          />
+        </TitleContainer>
 
         <BuilderContainer>
           <SidePanel>
@@ -475,10 +558,35 @@ function App() {
           </ModalOverlay>
         )}
 
-        <button onClick={() => setPreviewMode(!previewMode)}>
+        {showHistory && (
+          <ModalOverlay>
+            <PropertiesPanel>
+              <h2>Form History</h2>
+              <ul style={{ listStyle: "none", padding: 0 }}>
+                {formHistory.map((form) => (
+                  <li key={form.id} style={{ marginBottom: "10px" }}>
+                    <button onClick={() => loadForm(form.id)}>
+                      {form.form_name}
+                    </button>
+                    <div>
+                      Last updated:{" "}
+                      {new Date(form.updated_at).toLocaleString()}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <CloseButton onClick={() => setShowHistory(false)}>
+                Close
+              </CloseButton>
+            </PropertiesPanel>
+          </ModalOverlay>
+        )}
+
+        <MainButton onClick={handleShowHistory}>History</MainButton>
+        <MainButton onClick={() => setPreviewMode(!previewMode)}>
           {previewMode ? "Edit Mode" : "Preview Mode"}
-        </button>
-        <button onClick={handleSaveForm}>Save Form</button>
+        </MainButton>
+        <MainButton onClick={handleSaveForm}>Save Form</MainButton>
       </AppContainer>
     </DndProvider>
   );
