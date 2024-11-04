@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import styled from 'styled-components';
+import React, { useState } from "react";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import styled from "styled-components";
 
 const AppContainer = styled.div`
   text-align: center;
@@ -73,6 +73,17 @@ const PropertiesPanel = styled.div`
   width: 400px;
   max-width: 90%;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const Label = styled.label`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-weight: bold;
+  margin-bottom: 8px;
 `;
 
 const CloseButton = styled.button`
@@ -85,15 +96,12 @@ const CloseButton = styled.button`
   cursor: pointer;
 `;
 
-const PreviewArea = styled.div`
-  margin-top: 20px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  background-color: #f4f4f4;
+const PreviewPanel = styled(PropertiesPanel)`
+  width: 500px;
 `;
 
 const ItemTypes = {
-  COMPONENT: 'component',
+  COMPONENT: "component",
 };
 
 const ComponentItem = ({ component }) => {
@@ -112,7 +120,11 @@ const ComponentItem = ({ component }) => {
   );
 };
 
-const FormBuilderDropArea = ({ formComponents, setFormComponents, openPropertiesPanel }) => {
+const FormBuilderDropArea = ({
+  formComponents,
+  setFormComponents,
+  openPropertiesPanel,
+}) => {
   const [, drop] = useDrop(() => ({
     accept: ItemTypes.COMPONENT,
     drop: (item) => addComponentToForm(item),
@@ -124,15 +136,23 @@ const FormBuilderDropArea = ({ formComponents, setFormComponents, openProperties
       {
         type: component.id,
         label: component.label,
-        placeholder: '',
+        placeholder: "",
         required: false,
-        options: [],
+        maxLength: component.id === "textArea" ? 100 : undefined,
+        options:
+          component.id === "selectDropdown" ||
+          component.id === "checkbox" ||
+          component.id === "radioButton"
+            ? []
+            : undefined,
       },
     ]);
   };
 
   const deleteComponent = (index) => {
-    setFormComponents((prevComponents) => prevComponents.filter((_, i) => i !== index));
+    setFormComponents((prevComponents) =>
+      prevComponents.filter((_, i) => i !== index)
+    );
   };
 
   return (
@@ -142,7 +162,9 @@ const FormBuilderDropArea = ({ formComponents, setFormComponents, openProperties
         <FormComponent key={index}>
           <span>{component.label}</span>
           <div>
-            <IconButton onClick={() => openPropertiesPanel(index)}>⋮</IconButton>
+            <IconButton onClick={() => openPropertiesPanel(index)}>
+              ⋮
+            </IconButton>
             <IconButton onClick={() => deleteComponent(index)}>🗑️</IconButton>
           </div>
         </FormComponent>
@@ -152,20 +174,63 @@ const FormBuilderDropArea = ({ formComponents, setFormComponents, openProperties
 };
 
 function App() {
-  const [formTitle, setFormTitle] = useState('');
+  const [formTitle, setFormTitle] = useState("");
   const [formComponents, setFormComponents] = useState([]);
   const [selectedComponentIndex, setSelectedComponentIndex] = useState(null);
   const [previewMode, setPreviewMode] = useState(false);
 
   const componentsList = [
-    { id: 'textInput', label: 'Text Input' },
-    { id: 'textArea', label: 'Text Area' },
-    { id: 'selectDropdown', label: 'Select Dropdown' },
-    { id: 'checkbox', label: 'Checkbox' },
-    { id: 'radioButton', label: 'Radio Button' },
-    { id: 'datePicker', label: 'Date Picker' },
-    { id: 'fileUpload', label: 'File Upload' }
+    { id: "textInput", label: "Text Input" },
+    { id: "textArea", label: "Text Area" },
+    { id: "selectDropdown", label: "Select Dropdown" },
+    { id: "checkbox", label: "Checkbox" },
+    { id: "radioButton", label: "Radio Button" },
+    { id: "datePicker", label: "Date Picker" },
+    { id: "fileUpload", label: "File Upload" },
   ];
+
+  const openPropertiesPanel = (index) => {
+    setSelectedComponentIndex(index);
+  };
+
+  const handlePropertyChange = (e, property) => {
+    const value =
+      e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setFormComponents((prevComponents) =>
+      prevComponents.map((comp, i) =>
+        i === selectedComponentIndex ? { ...comp, [property]: value } : comp
+      )
+    );
+  };
+
+  const handleOptionsChange = (index, newValue) => {
+    setFormComponents((prevComponents) =>
+      prevComponents.map((comp, i) =>
+        i === selectedComponentIndex
+          ? {
+              ...comp,
+              options: comp.options.map((opt, optIndex) =>
+                optIndex === index ? newValue : opt
+              ),
+            }
+          : comp
+      )
+    );
+  };
+
+  const addOption = () => {
+    setFormComponents((prevComponents) =>
+      prevComponents.map((comp, i) =>
+        i === selectedComponentIndex
+          ? { ...comp, options: [...comp.options, ""] }
+          : comp
+      )
+    );
+  };
+
+  const closePropertiesPanel = () => {
+    setSelectedComponentIndex(null);
+  };
 
   const handleSaveForm = async () => {
     const formData = {
@@ -174,33 +239,24 @@ function App() {
     };
 
     try {
-      const response = await fetch('http://localhost:8000/api/forms/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'my-secure-api-token' },
+      const response = await fetch("http://localhost:8000/api/forms/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "my-secure-api-token",
+        },
         body: JSON.stringify(formData),
       });
       const result = await response.json();
-      console.log('Form saved:', result);
-      alert(result.message || 'Form saved successfully!');
+      console.log("Form saved:", result);
+      alert(result.message || "Form saved successfully!");
     } catch (error) {
-      console.error('Error saving form:', error);
+      console.error("Error saving form:", error);
     }
   };
 
-  const openPropertiesPanel = (index) => {
-    setSelectedComponentIndex(index);
-  };
-
-  const handlePropertyChange = (e, property) => {
-    setFormComponents((prevComponents) =>
-      prevComponents.map((comp, i) =>
-        i === selectedComponentIndex ? { ...comp, [property]: e.target.type === 'checkbox' ? e.target.checked : e.target.value } : comp
-      )
-    );
-  };
-
-  const closePropertiesPanel = () => {
-    setSelectedComponentIndex(null);
+  const closePreviewPanel = () => {
+    setPreviewMode(false);
   };
 
   return (
@@ -233,58 +289,195 @@ function App() {
           <ModalOverlay>
             <PropertiesPanel>
               <h3>Edit Properties</h3>
-              <label>
+              <Label>
                 Label:
                 <input
                   type="text"
                   value={formComponents[selectedComponentIndex].label}
-                  onChange={(e) => handlePropertyChange(e, 'label')}
+                  onChange={(e) => handlePropertyChange(e, "label")}
                 />
-              </label>
-              <label>
-                Placeholder:
-                <input
-                  type="text"
-                  value={formComponents[selectedComponentIndex].placeholder}
-                  onChange={(e) => handlePropertyChange(e, 'placeholder')}
-                />
-              </label>
-              <label>
-                Required:
-                <input
-                  type="checkbox"
-                  checked={formComponents[selectedComponentIndex].required}
-                  onChange={(e) => handlePropertyChange(e, 'required')}
-                />
-              </label>
-              <CloseButton onClick={closePropertiesPanel}>Save & Close</CloseButton>
+              </Label>
+
+              {["textInput", "textArea"].includes(
+                formComponents[selectedComponentIndex].type
+              ) && (
+                <>
+                  <Label>
+                    Placeholder:
+                    <input
+                      type="text"
+                      value={formComponents[selectedComponentIndex].placeholder}
+                      onChange={(e) => handlePropertyChange(e, "placeholder")}
+                    />
+                  </Label>
+                  <Label>
+                    Required:
+                    <input
+                      type="checkbox"
+                      checked={formComponents[selectedComponentIndex].required}
+                      onChange={(e) => handlePropertyChange(e, "required")}
+                    />
+                  </Label>
+                  {formComponents[selectedComponentIndex].type ===
+                    "textArea" && (
+                    <Label>
+                      Max Characters:
+                      <input
+                        type="number"
+                        value={
+                          formComponents[selectedComponentIndex].maxLength || ""
+                        }
+                        onChange={(e) => handlePropertyChange(e, "maxLength")}
+                      />
+                    </Label>
+                  )}
+                </>
+              )}
+
+              {["selectDropdown", "checkbox", "radioButton"].includes(
+                formComponents[selectedComponentIndex].type
+              ) && (
+                <>
+                  <Label>Required:</Label>
+                  <input
+                    type="checkbox"
+                    checked={formComponents[selectedComponentIndex].required}
+                    onChange={(e) => handlePropertyChange(e, "required")}
+                  />
+                  <Label>Options:</Label>
+                  {formComponents[selectedComponentIndex].options.map(
+                    (opt, index) => (
+                      <input
+                        key={index}
+                        type="text"
+                        value={opt}
+                        onChange={(e) =>
+                          handleOptionsChange(index, e.target.value)
+                        }
+                      />
+                    )
+                  )}
+                  <button onClick={addOption}>Add Option</button>
+                </>
+              )}
+
+              {formComponents[selectedComponentIndex].type === "datePicker" && (
+                <Label>
+                  Required:
+                  <input
+                    type="checkbox"
+                    checked={formComponents[selectedComponentIndex].required}
+                    onChange={(e) => handlePropertyChange(e, "required")}
+                  />
+                </Label>
+              )}
+
+              {formComponents[selectedComponentIndex].type === "fileUpload" && (
+                <Label>
+                  Required:
+                  <input
+                    type="checkbox"
+                    checked={formComponents[selectedComponentIndex].required}
+                    onChange={(e) => handlePropertyChange(e, "required")}
+                  />
+                </Label>
+              )}
+              <CloseButton onClick={closePropertiesPanel}>
+                Save & Close
+              </CloseButton>
             </PropertiesPanel>
           </ModalOverlay>
         )}
 
-        <button onClick={() => setPreviewMode(!previewMode)}>
-          {previewMode ? 'Edit Mode' : 'Preview Mode'}
-        </button>
         {previewMode && (
-          <PreviewArea>
-            <h2>Form Preview</h2>
-            <div>{formTitle}</div>
-            {formComponents.map((comp, index) => (
-              <div key={index}>
-                <label>{comp.label}</label>
-                {comp.type === 'textInput' && <input type="text" placeholder={comp.placeholder} />}
-                {comp.type === 'textArea' && <textarea placeholder={comp.placeholder} />}
-                {comp.type === 'selectDropdown' && (
-                  <select>
-                    {comp.options.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            ))}
-          </PreviewArea>
+          <ModalOverlay>
+            <PreviewPanel>
+              <h2>Form Preview</h2>
+              <div>{formTitle}</div>
+              {formComponents.map((comp, index) => (
+                <div key={index} style={{ marginBottom: "15px" }}>
+                  <label>{comp.label}</label>
+                  {comp.type === "textInput" && (
+                    <input
+                      type="text"
+                      placeholder={comp.placeholder}
+                      required={comp.required}
+                    />
+                  )}
+                  {comp.type === "textArea" && (
+                    <textarea
+                      placeholder={comp.placeholder}
+                      maxLength={comp.maxLength}
+                      required={comp.required}
+                    />
+                  )}
+                  {comp.type === "selectDropdown" && (
+                    <select required={comp.required}>
+                      <option value="">Select an option</option>
+                      {comp.options &&
+                        comp.options.map((opt, i) => (
+                          <option key={i} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                  {comp.type === "checkbox" && (
+                    <div>
+                      {comp.options &&
+                        comp.options.map((opt, i) => (
+                          <label
+                            key={i}
+                            style={{ display: "block", margin: "5px 0" }}
+                          >
+                            <input
+                              type="checkbox"
+                              name={comp.label}
+                              value={opt}
+                              required={comp.required}
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                  {comp.type === "radioButton" && (
+                    <div>
+                      {comp.options &&
+                        comp.options.map((opt, i) => (
+                          <label
+                            key={i}
+                            style={{ display: "block", margin: "5px 0" }}
+                          >
+                            <input
+                              type="radio"
+                              name={`radio-${index}`}
+                              value={opt}
+                              required={comp.required}
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                  {comp.type === "datePicker" && (
+                    <input type="date" required={comp.required} />
+                  )}
+                  {comp.type === "fileUpload" && (
+                    <input type="file" required={comp.required} />
+                  )}
+                </div>
+              ))}
+              <CloseButton onClick={closePreviewPanel}>
+                Close Preview
+              </CloseButton>
+            </PreviewPanel>
+          </ModalOverlay>
         )}
+
+        <button onClick={() => setPreviewMode(!previewMode)}>
+          {previewMode ? "Edit Mode" : "Preview Mode"}
+        </button>
         <button onClick={handleSaveForm}>Save Form</button>
       </AppContainer>
     </DndProvider>
